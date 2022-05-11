@@ -80,6 +80,9 @@ class _KeyboardDemoState extends State<KeyboardDemo> {
               onTextInput: (myText) {
                 _insertText(myText);
               },
+              onBackspace: () {
+                _backspace();
+              },
             ),
           ],
         ),
@@ -103,6 +106,52 @@ class _KeyboardDemoState extends State<KeyboardDemo> {
     );
   }
 
+  void _backspace() {
+    final text = _controller.text;
+    final textSelection = _controller.selection;
+    final selectionLength = textSelection.end - textSelection.start;
+
+    // There is a selection.
+    if (selectionLength > 0) {
+      final newText = text.replaceRange(
+        textSelection.start,
+        textSelection.end,
+        '',
+      );
+      _controller.text = newText;
+      _controller.selection = textSelection.copyWith(
+        baseOffset: textSelection.start,
+        extentOffset: textSelection.start,
+      );
+      return;
+    }
+
+    // The cursor is at the beginning.
+    if (textSelection.start == 0) {
+      return;
+    }
+
+    // Delete the previous character
+    final previousCodeUnit = text.codeUnitAt(textSelection.start - 1);
+    final offset = _isUtf16Surrogate(previousCodeUnit) ? 2 : 1;
+    final newStart = textSelection.start - offset;
+    final newEnd = textSelection.start;
+    final newText = text.replaceRange(
+      newStart,
+      newEnd,
+      '',
+    );
+    _controller.text = newText;
+    _controller.selection = textSelection.copyWith(
+      baseOffset: newStart,
+      extentOffset: newStart,
+    );
+  }
+
+  bool _isUtf16Surrogate(int value) {
+    return value & 0xF800 == 0xD800;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -121,11 +170,14 @@ class CustomKeyboard extends StatelessWidget {
   CustomKeyboard({
     Key? key,
     this.onTextInput,
+    this.onBackspace,
   }) : super(key: key);
 
   final ValueSetter<String>? onTextInput;
+  final VoidCallback? onBackspace;
 
   void _textInputHandler(String text) => onTextInput!.call(text);
+  void _backspaceHandler() => onBackspace?.call();
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +205,11 @@ class CustomKeyboard extends StatelessWidget {
               children: [
                 TextKey(
                   text: ' ',
+                  flex: 3,
                   onTextInput: _textInputHandler,
+                ),
+                BackspaceKey(
+                  onBackspace: _backspaceHandler,
                 ),
               ],
             ),
@@ -190,6 +246,40 @@ class TextKey extends StatelessWidget {
             },
             child: Container(
               child: Center(child: Text(text!)),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class BackspaceKey extends StatelessWidget {
+  const BackspaceKey({
+    Key? key,
+    this.onBackspace,
+    this.flex = 1,
+  }) : super(key: key);
+
+  final VoidCallback? onBackspace;
+  final int flex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Padding(
+        padding: const EdgeInsets.all(1.0),
+        child: Material(
+          color: Colors.blue.shade100,
+          child: InkWell(
+            onTap: () {
+              onBackspace?.call();
+            },
+            child: Container(
+              child: Center(
+                child: Icon(Icons.backspace),
+              ),
             ),
           ),
         ),
